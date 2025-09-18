@@ -113,3 +113,43 @@ Period 7 → 2:00 PM - 3:00 PM | PHILOSOPHY
 Period 8 → 3:00 PM - 4:00 PM | ELS
 ```
 
+### `students`  
+| student_id | qr_data             | student_name              | grade_level | section_id | guardian_contact | lrn          |
+|------------|---------------------|---------------------------|-------------|------------|-----------------|--------------|
+| 1          | MNHS2025202600001   | Jerence Charles Visperas  | 12          | 1          | +639318387130   | 10181500000  |
+
+---
+
+### `sections`  
+| section_id | section_name | grade_level |
+|------------|--------------|-------------|
+| 1          | ICT-1        | 12          |
+
+---
+
+### `subjects`  
+| subject_id | subject_name      |
+|------------|-------------------|
+| 1          | Java-Programming  |
+| 2          | Break-Time        |
+| 3          | CPAR              |
+| 4          | PR2               |
+| 5          | Lunch-Break       |
+| 6          | MIL               |
+| 7          | PHILOSOPHY        |
+| 8          | ELS               |
+
+---
+
+### `schedule` (Monday, Section ICT-1)  
+| schedule_id | section_id | day    | period | time              | subject_id | subject_name      |
+|-------------|------------|--------|--------|-------------------|------------|-------------------|
+| 1           | 1          | Monday | 1      | 7:30 AM - 9:30 AM | 1          | Java-Programming  |
+| 2           | 1          | Monday | 2      | 9:30 AM - 10:00 AM| 2          | Break-Time        |
+| 3           | 1          | Monday | 3      | 10:00 AM - 11:00 AM| 3         | CPAR              |
+| 4           | 1          | Monday | 4      | 11:00 AM - 12:00 PM| 4         | PR2               |
+| 5           | 1          | Monday | 5      | 12:00 PM - 1:00 PM | 5         | Lunch-Break       |
+| 6           | 1          | Monday | 6      | 1:00 PM - 2:00 PM  | 6         | MIL               |
+| 7           | 1          | Monday | 7      | 2:00 PM - 3:00 PM  | 7         | PHILOSOPHY        |
+| 8           | 1          | Monday | 8      | 3:00 PM - 4:00 PM  | 8         | ELS               |
+
