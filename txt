@@ -1,0 +1,92 @@
+using System;
+using System.Data.SqlClient;
+using System.Drawing;
+using System.Windows.Forms;
+using AForge.Video;
+using AForge.Video.DirectShow;
+using ZXing;
+
+namespace QRScannerApp
+{
+    public partial class Scanner : Form
+    {
+        private FilterInfoCollection CaptureDevice;
+        private VideoCaptureDevice FinalFrame;
+
+        public Scanner()
+        {
+            InitializeComponent();
+        }
+
+        private void Scanner_Load(object sender, EventArgs e)
+        {
+            // Start camera on load
+            CaptureDevice = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+            if (CaptureDevice.Count == 0)
+            {
+                MessageBox.Show("No camera found!");
+                return;
+            }
+
+            FinalFrame = new VideoCaptureDevice(CaptureDevice[0].MonikerString);
+            FinalFrame.NewFrame += new NewFrameEventHandler(FinalFrame_NewFrame);
+            FinalFrame.Start();
+            timer1.Start();
+        }
+
+        private void FinalFrame_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            pictureBox1.Image = (Bitmap)eventArgs.Frame.Clone();
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (pictureBox1.Image == null) return;
+
+            BarcodeReader reader = new BarcodeReader();
+            var result = reader.Decode((Bitmap)pictureBox1.Image);
+            if (result != null)
+            {
+                string qrData = result.Text;
+                FetchStudentInfo(qrData);
+
+                timer1.Stop();
+                if (FinalFrame.IsRunning)
+                    FinalFrame.SignalToStop();
+            }
+        }
+
+        private void FetchStudentInfo(string qrData)
+        {
+            string connectionString = "Data Source=YOUR_SERVER_NAME;Initial Catalog=YOUR_DATABASE_NAME;Integrated Security=True;";
+            string query = "SELECT student_name, grade_level, section_id, lrn FROM students WHERE qr_data = @qr_data";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@qr_data", qrData);
+
+                SqlDataReader reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    lblName.Text = "Name: " + reader["student_name"].ToString();
+                    lblGrade.Text = "Grade: " + reader["grade_level"].ToString();
+                    lblSection.Text = "Section: " + reader["section_id"].ToString();
+                    lblLRN.Text = "LRN: " + reader["lrn"].ToString();
+                }
+                else
+                {
+                    lblName.Text = "No record found.";
+                    lblGrade.Text = lblSection.Text = lblLRN.Text = string.Empty;
+                }
+            }
+        }
+
+        private void Scanner_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (FinalFrame != null && FinalFrame.IsRunning)
+                FinalFrame.SignalToStop();
+        }
+    }
+}
