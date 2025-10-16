@@ -1,0 +1,26 @@
+if (isScanning)
+{
+    BarcodeReader reader = new BarcodeReader();
+    var result = reader.Decode(frame);
+
+    if (result != null)
+    {
+        string qrText = result.Text;
+
+        if ((DateTime.Now - lastScanTime).TotalSeconds > 2)
+        {
+            lastScanTime = DateTime.Now;
+
+            if (!listBoxScans.Items.Contains(qrText))
+            {
+                string logEntry = $"{DateTime.Now:HH:mm:ss} - {qrText}";
+                Invoke(new Action(() =>
+                {
+                    listBoxScans.Items.Add(logEntry);
+                }));
+
+                SaveAttendance(qrText);
+            }
+        }
+    }
+}
