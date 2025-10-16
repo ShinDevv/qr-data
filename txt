@@ -10,83 +10,158 @@ namespace QRScannerApp
 {
     public partial class Scanner : Form
     {
-        private FilterInfoCollection CaptureDevice;
-        private VideoCaptureDevice FinalFrame;
+        private FilterInfoCollection captureDevices;
+        private VideoCaptureDevice videoDevice;
+        private Timer scanTimer; // WinForms Timer
 
         public Scanner()
         {
             InitializeComponent();
+            CreateTimer();
+        }
+
+        private void CreateTimer()
+        {
+            scanTimer = new Timer();
+            scanTimer.Interval = 100; // milliseconds
+            scanTimer.Tick += new EventHandler(ScanTimer_Tick);
         }
 
         private void Scanner_Load(object sender, EventArgs e)
         {
-            // Start camera on load
-            CaptureDevice = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-            if (CaptureDevice.Count == 0)
+            try
             {
-                MessageBox.Show("No camera found!");
-                return;
+                captureDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                if (captureDevices.Count == 0)
+                {
+                    MessageBox.Show("No camera found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                videoDevice = new VideoCaptureDevice(captureDevices[0].MonikerString);
+                videoDevice.NewFrame += new NewFrameEventHandler(VideoDevice_NewFrame);
+                videoDevice.Start();
+
+                scanTimer.Start();
             }
-
-            FinalFrame = new VideoCaptureDevice(CaptureDevice[0].MonikerString);
-            FinalFrame.NewFrame += new NewFrameEventHandler(FinalFrame_NewFrame);
-            FinalFrame.Start();
-            timer1.Start();
-        }
-
-        private void FinalFrame_NewFrame(object sender, NewFrameEventArgs eventArgs)
-        {
-            pictureBox1.Image = (Bitmap)eventArgs.Frame.Clone();
-        }
-
-        private void timer1_Tick(object sender, EventArgs e)
-        {
-            if (pictureBox1.Image == null) return;
-
-            BarcodeReader reader = new BarcodeReader();
-            var result = reader.Decode((Bitmap)pictureBox1.Image);
-            if (result != null)
+            catch (Exception ex)
             {
-                string qrData = result.Text;
-                FetchStudentInfo(qrData);
+                MessageBox.Show("Error starting camera: " + ex.Message);
+            }
+        }
 
-                timer1.Stop();
-                if (FinalFrame.IsRunning)
-                    FinalFrame.SignalToStop();
+        private void VideoDevice_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            try
+            {
+                Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
+
+                // Invoke ensures safe UI thread update for .NET 4.7.2
+                if (pictureBox1.InvokeRequired)
+                {
+                    pictureBox1.BeginInvoke(new Action(delegate
+                    {
+                        if (pictureBox1.Image != null)
+                        {
+                            pictureBox1.Image.Dispose();
+                        }
+                        pictureBox1.Image = frame;
+                    }));
+                }
+                else
+                {
+                    if (pictureBox1.Image != null)
+                        pictureBox1.Image.Dispose();
+
+                    pictureBox1.Image = frame;
+                }
+            }
+            catch { /* ignore frame errors */ }
+        }
+
+        private void ScanTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (pictureBox1.Image == null) return;
+
+                Bitmap bitmap = new Bitmap(pictureBox1.Image);
+                BarcodeReader reader = new BarcodeReader();
+                var result = reader.Decode(bitmap);
+                bitmap.Dispose();
+
+                if (result != null)
+                {
+                    scanTimer.Stop();
+                    StopCamera();
+                    FetchStudentInfo(result.Text);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Timer Error: " + ex.Message);
             }
         }
 
         private void FetchStudentInfo(string qrData)
         {
-            string connectionString = "Data Source=YOUR_SERVER_NAME;Initial Catalog=YOUR_DATABASE_NAME;Integrated Security=True;";
-            string query = "SELECT student_name, grade_level, section_id, lrn FROM students WHERE qr_data = @qr_data";
-
-            using (SqlConnection conn = new SqlConnection(connectionString))
+            try
             {
-                conn.Open();
-                SqlCommand cmd = new SqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@qr_data", qrData);
+                string connectionString = "Data Source=YOUR_SERVER_NAME;Initial Catalog=YOUR_DATABASE_NAME;Integrated Security=True;";
+                string query = "SELECT student_name, grade_level, section_id, lrn FROM students WHERE qr_data = @qr_data";
 
-                SqlDataReader reader = cmd.ExecuteReader();
-                if (reader.Read())
+                using (SqlConnection conn = new SqlConnection(connectionString))
                 {
-                    lblName.Text = "Name: " + reader["student_name"].ToString();
-                    lblGrade.Text = "Grade: " + reader["grade_level"].ToString();
-                    lblSection.Text = "Section: " + reader["section_id"].ToString();
-                    lblLRN.Text = "LRN: " + reader["lrn"].ToString();
-                }
-                else
-                {
-                    lblName.Text = "No record found.";
-                    lblGrade.Text = lblSection.Text = lblLRN.Text = string.Empty;
+                    conn.Open();
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@qr_data", qrData);
+                        SqlDataReader reader = cmd.ExecuteReader();
+
+                        if (reader.Read())
+                        {
+                            lblName.Text = "Name: " + reader["student_name"].ToString();
+                            lblGrade.Text = "Grade: " + reader["grade_level"].ToString();
+                            lblSection.Text = "Section: " + reader["section_id"].ToString();
+                            lblLRN.Text = "LRN: " + reader["lrn"].ToString();
+                        }
+                        else
+                        {
+                            lblName.Text = "No record found.";
+                            lblGrade.Text = lblSection.Text = lblLRN.Text = string.Empty;
+                        }
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Database error: " + ex.Message);
+            }
+        }
+
+        private void StopCamera()
+        {
+            try
+            {
+                if (videoDevice != null && videoDevice.IsRunning)
+                {
+                    videoDevice.SignalToStop();
+                    videoDevice.NewFrame -= new NewFrameEventHandler(VideoDevice_NewFrame);
+                    videoDevice = null;
+                }
+            }
+            catch { }
         }
 
         private void Scanner_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (FinalFrame != null && FinalFrame.IsRunning)
-                FinalFrame.SignalToStop();
+            scanTimer.Stop();
+            StopCamera();
+            if (pictureBox1.Image != null)
+            {
+                pictureBox1.Image.Dispose();
+                pictureBox1.Image = null;
+            }
         }
     }
 }
