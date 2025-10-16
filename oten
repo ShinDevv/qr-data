@@ -1,0 +1,14 @@
+if (videoDevice != null && videoDevice.IsRunning)
+{
+    videoDevice.SignalToStop();
+    btnStart.Text = "Start Camera";
+    isScanning = false;
+    return;
+}
+
+videoDevice = new VideoCaptureDevice(captureDevices[0].MonikerString);
+videoDevice.NewFrame += new NewFrameEventHandler(VideoDevice_NewFrame);
+videoDevice.Start();
+
+btnStart.Text = "Stop Camera";
+isScanning = true;
